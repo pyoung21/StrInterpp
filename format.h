@@ -51,6 +51,6 @@ constexpr auto sformat(Fmt, Args&&... args)
 {
 	static_assert(internal::count_args(Fmt{}) == sizeof...(args), "fmt: Arguments don't match format.");
 	std::array<char, internal::get_format_size<Fmt, Args...>()> ret{ 0 };
-	constexpr auto t = internal::get_format_size<Fmt, Args...>();
+
 	return ret;
 }
