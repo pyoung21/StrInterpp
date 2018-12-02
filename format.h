@@ -1,6 +1,3 @@
-// Fmt.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
-
 #include <array>
 
 #define FMT(s) [] () constexpr -> auto { \
@@ -11,9 +8,6 @@
 	}; \
 	return _{}; \
 }()
-
-auto _fmt_ = FMT("");
-using PYSTRING_Type = decltype(_fmt_);
 
 template<typename Fmt>
 constexpr auto count_args(Fmt fmt) -> size_t
@@ -41,12 +35,6 @@ constexpr bool is_string(T t)
 	return false;
 }
 
-template<>
-constexpr bool is_string(const char*)
-{
-	return true;
-}
-
 template<size_t N>
 constexpr bool is_string(const char(&)[N])
 {
@@ -54,17 +42,17 @@ constexpr bool is_string(const char(&)[N])
 }
 
 template<typename T>
-constexpr auto get_arg_size()
+constexpr auto get_arg_size(T arg)
 {
-	if constexpr (is_string(T{}))
-		return sizeof(T) - 1;
-	return sizeof(T);
+	if constexpr (is_string(arg))
+		return sizeof(arg) - 1;
+	return get_represented_size(arg);
 }
 
-template<typename Fmt, typename... Args>
+template<typename Fmt, size_t N>
 constexpr auto get_format_size()
 {
-	return (0 + ... + get_arg_size<Args>()) + (Fmt::size() - (sizeof...(Args) * 2));
+	return (Fmt::size() - (N * 2));
 }
 
 template<typename T>
@@ -95,23 +83,68 @@ constexpr int writeFormat(char *data, Fmt fmt)
 	return 0;
 }
 
-template<typename Fmt, typename... Args>
-constexpr auto myFormat(Fmt, Args&&... args)
+template<typename T>
+constexpr size_t get_represented_size(T arg)
+{
+	int i = 0;
+	bool sign = arg < 0;
+	for (; arg != 0; arg /= 10, i++) {}
+	return sign ? i + 1 : i;
+}
+
+constexpr size_t get_represented_size(char arg)
+{
+	return 1;
+}
+
+constexpr size_t get_represented_size(double arg)
+{
+	return get_represented_size(static_cast<int64_t>(arg)) + 0x10;
+}
+
+template<typename... Args>
+constexpr size_t get_args_size(Args... args)
+{
+	return (0 + ... + get_arg_size(args));
+}
+
+template<typename ArgFmt, typename Fmt, typename... Args>
+constexpr auto myFormat(ArgFmt, Fmt, Args&&... args)
 {
 	static_assert(count_args(Fmt{}) == sizeof...(args), "fmt: Arguments don't match format.");
 
-	std::array<char, get_format_size<Fmt, Args...>()> data{ 0 };
+	std::array<char, Fmt::size() + ArgFmt::size() - (sizeof...(args)*2) + 1> data{ 0 };
 	auto *pData = data.data();
 
-	int l[] = { writeFormat(pData, Fmt{}), formatArg(pData, args, data.size())... };
+	//int l[] = { writeFormat(pData, Fmt{}), formatArg(pData, args, data.size())... };
 
 	return data;
 }
 
-#define $(fmt, ...) (myFormat(FMT(fmt), __VA_ARGS__))
+#define ARGFMT(str, m) [] () constexpr -> auto { \
+	struct _ { \
+		static constexpr size_t size() { \
+			size_t ret = 0; \
+			size_t max = m*2; \
+			for (int i = 0;str[i] != 0 && m > 0;i++) { \
+				if (str[i] != ',' && str[i] != ' ') ret++, max--; \
+			} \
+			return ret; \
+		} \
+	}; \
+	return _{}; \
+}()
+
+template<typename... Args>
+constexpr auto count_args(Args... args)
+{
+	return sizeof...(args);
+}
+
+#define $(fmt,...) (myFormat(ARGFMT(#__VA_ARGS__, count_args(__VA_ARGS__)), FMT(fmt), __VA_ARGS__))
+#define test(...) (sizeof(__VA_ARGS__));
 
 int main()
 {
-	//constexpr auto t = is_pystring<decltype(_fmt_)>::value;
-	constexpr auto str = $("my format {} {} {}", 1, 2, 3);
+	constexpr auto str = $("abcdefg {} {} {}", 1, 2, "abcdef");
 }
