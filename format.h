@@ -121,13 +121,16 @@ constexpr auto myFormat(ArgFmt, Fmt, Args&&... args)
 	return data;
 }
 
-#define ARGFMT(str, m) [] () constexpr -> auto { \
+#define ARGFMT(str) [] () constexpr -> auto { \
 	struct _ { \
 		static constexpr size_t size() { \
 			size_t ret = 0; \
-			size_t max = m*2; \
-			for (int i = 0;str[i] != 0 && m > 0;i++) { \
-				if (str[i] != ',' && str[i] != ' ') ret++, max--; \
+			for (int i = 0; str[i] != 0; i++) { \
+				if (str[i] == '"') { \
+					i++; \
+					while (str[i] != '\"' && i++) { ret++; } \
+				} \
+				else if (str[i] != ',' && str[i] != ' ') { ret++; } \
 			} \
 			return ret; \
 		} \
@@ -135,14 +138,7 @@ constexpr auto myFormat(ArgFmt, Fmt, Args&&... args)
 	return _{}; \
 }()
 
-template<typename... Args>
-constexpr auto count_args(Args... args)
-{
-	return sizeof...(args);
-}
-
-#define $(fmt,...) (myFormat(ARGFMT(#__VA_ARGS__, count_args(__VA_ARGS__)), FMT(fmt), __VA_ARGS__))
-#define test(...) (sizeof(__VA_ARGS__));
+#define $(fmt,...) (myFormat(ARGFMT(#__VA_ARGS__), FMT(fmt), __VA_ARGS__))
 
 int main()
 {
